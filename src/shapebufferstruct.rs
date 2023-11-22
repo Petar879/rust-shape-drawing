@@ -4,7 +4,7 @@ use {
     speedy2d::dimen::Vector2,
 };
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ShapeKind
 {
     Circle,
@@ -13,7 +13,7 @@ pub enum ShapeKind
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShapeBufferStruct
 {
     pub shape_type: ShapeKind,

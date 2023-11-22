@@ -1,3 +1,5 @@
+use speedy2d::window::MouseButton;
+
 mod shapebufferstruct;
 
 use {
@@ -7,6 +9,8 @@ use {
     egui_speedy2d::{WindowHandler, WindowWrapper},
     speedy2d::{color::Color, window::WindowHelper, Graphics2D, Window, dimen::Vector2, shape::Rectangle},
 };
+
+const TASK_REQUIRED_PIXEL_MINIMUM: f32 = 3.0; 
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
@@ -72,7 +76,6 @@ impl WindowHandler for MyWindowHandler
                             self.shape_buffer.clear();
                             self.shape_buffer = tmp_buffer;
                         }
-
                         
                     }
                     if ui.button("Save").clicked() {
@@ -117,27 +120,9 @@ impl WindowHandler for MyWindowHandler
 
             match shape_data.shape_type {
                 ShapeKind::Circle => 
-                {
-                    // Radius calculation from the two clicks
-                    let mut tmp_coordinate_holder:Vector2<f32> = Vector2::new(0.0, 0.0);
-    
-                    if shape_data.mouse_click_positions.0.x > shape_data.mouse_click_positions.1.x {
-                        tmp_coordinate_holder.x = shape_data.mouse_click_positions.0.x - shape_data.mouse_click_positions.1.x;
-                    }
-                    else {
-                        tmp_coordinate_holder.x = shape_data.mouse_click_positions.1.x - shape_data.mouse_click_positions.0.x;
-                    }
-    
-                    if shape_data.mouse_click_positions.0.y > shape_data.mouse_click_positions.1.y {
-                        tmp_coordinate_holder.y = shape_data.mouse_click_positions.0.y - shape_data.mouse_click_positions.1.y;
-                    }
-                    else {
-                        tmp_coordinate_holder.y = shape_data.mouse_click_positions.1.y - shape_data.mouse_click_positions.0.y;
-                    }
-    
-                    let circle_radius = if tmp_coordinate_holder.x > tmp_coordinate_holder.y {tmp_coordinate_holder.x} else {tmp_coordinate_holder.y};
-    
-                    graphics.draw_circle(shape_data.mouse_click_positions.0, circle_radius, Color::RED);
+                {   
+                    let radius = calculate_radius(&shape_data.mouse_click_positions.0, &shape_data.mouse_click_positions.1);
+                    graphics.draw_circle(shape_data.mouse_click_positions.0, radius, Color::RED);
                 },
                 ShapeKind::Rectangle => 
                 {
@@ -161,27 +146,75 @@ impl WindowHandler for MyWindowHandler
     }
 
 
-    fn on_mouse_button_down(&mut self, _helper: &mut WindowHelper<()>, _button: speedy2d::window::MouseButton, _egui_ctx: &egui::Context,)
+    fn on_mouse_button_down(&mut self, _helper: &mut WindowHelper<()>, button: speedy2d::window::MouseButton, _egui_ctx: &egui::Context,)
     {
-        match self.mouse_click_counter {
-            1 => {
-                self.mouse_first_position = self.mouse_global_position;
-                self.mouse_click_counter += 1;
-            },
-
-            2 => {
-                if !matches!(self.shape_type, ShapeKind::None) 
-                {
-                    let tmp_var = ShapeBufferStruct {shape_type: self.shape_type,
-                                                     mouse_click_positions: (self.mouse_first_position, self.mouse_global_position)};
-                    self.shape_buffer.push(tmp_var);
-                }
-
-                self.mouse_click_counter -= 1;   
-            } 
-
-            _ => print!("Wrong value")
+        
+        if button == MouseButton::Left {
+            match self.mouse_click_counter {
+                1 => {
+                    self.mouse_first_position = self.mouse_global_position;
+                    self.mouse_click_counter += 1;
+                },
+    
+                2 => {
+                    if !matches!(self.shape_type, ShapeKind::None) 
+                    {
+                        let tmp_var = ShapeBufferStruct {shape_type: self.shape_type,
+                                                         mouse_click_positions: (self.mouse_first_position, self.mouse_global_position)};
+                        self.shape_buffer.push(tmp_var);
+                    }
+    
+                    self.mouse_click_counter -= 1;   
+                } 
+    
+                _ => print!("Wrong value")
+            }
         }
+        else {
+            //TODO Fix circle deletion
+            let mut tmp_shape:ShapeBufferStruct = ShapeBufferStruct { shape_type: ShapeKind::None, mouse_click_positions: (Vector2::new(0.0, 0.0), Vector2::new(0.0, 0.0)) }; 
+            let mut tmp_shape_buffer = self.shape_buffer.clone().reverse();
+
+            for shape in &self.shape_buffer {
+                if shape.shape_type == ShapeKind::Circle {
+
+                    let dx = self.mouse_global_position.x - shape.mouse_click_positions.0.x;
+                    let dy = self.mouse_global_position.y - shape.mouse_click_positions.0.y;
+                    let distance = (dx * dx + dy * dy).sqrt();
+                    let radius = calculate_radius(&shape.mouse_click_positions.0, &shape.mouse_click_positions.1);
+                    // distance <= radius;
+
+                    tmp_shape = if distance <= radius + TASK_REQUIRED_PIXEL_MINIMUM { shape.clone()} else { tmp_shape}  ;
+                }
+            }					
+            // shapes_data.retain(|&shape| shape != shape_to_remove);
+            self.shape_buffer.retain(|&shape| shape != tmp_shape )
+        }
+
+        
     }
     
+}
+
+fn calculate_radius (first_vector: &Vector2<f32>, second_vector : &Vector2<f32>) -> f32 {
+
+        let mut tmp_coordinate_holder:Vector2<f32> = Vector2::new(0.0, 0.0);
+
+        if first_vector.x > second_vector.x {
+            tmp_coordinate_holder.x = first_vector.x - second_vector.x;
+        }
+        else {
+            tmp_coordinate_holder.x = second_vector.x - first_vector.x;
+        }
+
+        if first_vector.y > second_vector.y {
+            tmp_coordinate_holder.y = first_vector.y - second_vector.y;
+        }
+        else {
+            tmp_coordinate_holder.y = second_vector.y - first_vector.y;
+        }
+
+        let radius = if tmp_coordinate_holder.x > tmp_coordinate_holder.y {tmp_coordinate_holder.x} else {tmp_coordinate_holder.y};
+
+        return radius;
 }
