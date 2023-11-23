@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use speedy2d::window::MouseButton;
 
 mod shapebufferstruct;
@@ -127,6 +129,7 @@ impl WindowHandler for MyWindowHandler
                 ShapeKind::Rectangle => 
                 {
                     let rectangle = Rectangle::new(shape_data.mouse_click_positions.0, shape_data.mouse_click_positions.1);
+                    
                     graphics.draw_rectangle(rectangle, Color::BLACK);
                 },
                 ShapeKind::None => 
@@ -171,30 +174,42 @@ impl WindowHandler for MyWindowHandler
             }
         }
         else {
-            //TODO Fix circle deletion
+            // Circle to be removed
             let mut tmp_shape:ShapeBufferStruct = ShapeBufferStruct { shape_type: ShapeKind::None, mouse_click_positions: (Vector2::new(0.0, 0.0), Vector2::new(0.0, 0.0)) }; 
-            let mut tmp_shape_buffer = self.shape_buffer.clone().reverse();
-
+            
+            // Inverted vector for shape removing
+            let mut shape_deque: VecDeque<ShapeBufferStruct> = VecDeque::new();
             for shape in &self.shape_buffer {
-                if shape.shape_type == ShapeKind::Circle {
+                shape_deque.push_front(shape.clone());
+            }		
 
+            
+
+            // Loop for checking if the mouse coordinates are on a rectangle or circle
+            for shape in &shape_deque{
+                if shape.shape_type == ShapeKind::Rectangle {
+                    let rectangle = Rectangle::new(shape.mouse_click_positions.0, shape.mouse_click_positions.1);
+                    if rectangle.contains(self.mouse_global_position) {
+                        break;
+                    }
+                }
+
+                if shape.shape_type == ShapeKind::Circle {
                     let dx = self.mouse_global_position.x - shape.mouse_click_positions.0.x;
                     let dy = self.mouse_global_position.y - shape.mouse_click_positions.0.y;
                     let distance = (dx * dx + dy * dy).sqrt();
                     let radius = calculate_radius(&shape.mouse_click_positions.0, &shape.mouse_click_positions.1);
-                    // distance <= radius;
-
                     tmp_shape = if distance <= radius + TASK_REQUIRED_PIXEL_MINIMUM { shape.clone()} else { tmp_shape}  ;
                 }
-            }					
-            // shapes_data.retain(|&shape| shape != shape_to_remove);
-            self.shape_buffer.retain(|&shape| shape != tmp_shape )
+            }		
+            self.shape_buffer.retain(|&shape| shape.mouse_click_positions != tmp_shape.mouse_click_positions )
         }
 
         
     }
     
 }
+
 
 fn calculate_radius (first_vector: &Vector2<f32>, second_vector : &Vector2<f32>) -> f32 {
 
