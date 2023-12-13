@@ -9,6 +9,7 @@ pub enum ShapeKind
 {
     Circle,
     Rectangle,
+    Line,
     None
 }
 
@@ -28,6 +29,7 @@ impl ShapeBufferStruct {
         match shape_kind.as_str() {
             "C" => tmp_shape_kind = ShapeKind::Circle,
             "R" => tmp_shape_kind = ShapeKind::Rectangle,
+            "L" => tmp_shape_kind = ShapeKind::Line,
             _ => println!("idk"),
         };
 
@@ -52,6 +54,10 @@ impl ShapeBufferStruct {
             ShapeKind::Rectangle =>
             {
                 shape_type_string = "R".to_owned();
+            },
+            ShapeKind::Line =>
+            {
+                shape_type_string = "L".to_owned();
             },
             ShapeKind::None => todo!(),
         }

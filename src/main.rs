@@ -1,8 +1,9 @@
 use std::collections::VecDeque;
 
-use speedy2d::window::MouseButton;
 
+use speedy2d::window::MouseButton;
 mod shapebufferstruct;
+
 
 use {
     shapebufferstruct::*,
@@ -13,6 +14,8 @@ use {
 };
 
 const TASK_REQUIRED_PIXEL_MINIMUM: f32 = 3.0; 
+const LINE_THICKNESS: f32 = 5.0;
+
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
@@ -113,6 +116,9 @@ impl WindowHandler for MyWindowHandler
                     if ui.button("Circle").clicked() {
                         self.shape_type = ShapeKind::Circle;
                     }
+                    if ui.button("Line").clicked() {
+                        self.shape_type = ShapeKind::Line;
+                    }
                 });
             });
          });
@@ -124,6 +130,7 @@ impl WindowHandler for MyWindowHandler
                 ShapeKind::Circle => 
                 {   
                     let radius = calculate_radius(&shape_data.mouse_click_positions.0, &shape_data.mouse_click_positions.1);
+                    // graphics.draw_circle(shape_data.mouse_click_positions.0, radius, Color::RED);
                     graphics.draw_circle(shape_data.mouse_click_positions.0, radius, Color::RED);
                 },
                 ShapeKind::Rectangle => 
@@ -132,7 +139,12 @@ impl WindowHandler for MyWindowHandler
                     
                     graphics.draw_rectangle(rectangle, Color::BLACK);
                 },
-                ShapeKind::None => 
+                ShapeKind::Line =>
+                {
+
+                    graphics.draw_line(shape_data.mouse_click_positions.0, shape_data.mouse_click_positions.1, LINE_THICKNESS, Color::BLACK);
+                }
+                _ => 
                 {
                     println!("Inpossible case");
                 },
@@ -183,29 +195,38 @@ impl WindowHandler for MyWindowHandler
                 shape_deque.push_front(shape.clone());
             }		
 
-            
-
             // Loop for checking if the mouse coordinates are on a rectangle or circle
-            for shape in &shape_deque{
-                if shape.shape_type == ShapeKind::Rectangle {
-                    let rectangle = Rectangle::new(shape.mouse_click_positions.0, shape.mouse_click_positions.1);
-                    if rectangle.contains(self.mouse_global_position) {
+            for shape in &self.shape_buffer {
+                match shape.shape_type {
+                    ShapeKind::Circle => 
+                    {
+                        let dx = self.mouse_global_position.x - shape.mouse_click_positions.0.x;
+                        let dy = self.mouse_global_position.y - shape.mouse_click_positions.0.y;
+                        let distance = (dx * dx + dy * dy).sqrt();
+                        let radius = calculate_radius(&shape.mouse_click_positions.0, &shape.mouse_click_positions.1);
+                        tmp_shape = if distance <= radius + TASK_REQUIRED_PIXEL_MINIMUM { shape.clone()} else { tmp_shape}  ;
                         break;
-                    }
-                }
-
-                if shape.shape_type == ShapeKind::Circle {
-                    let dx = self.mouse_global_position.x - shape.mouse_click_positions.0.x;
-                    let dy = self.mouse_global_position.y - shape.mouse_click_positions.0.y;
-                    let distance = (dx * dx + dy * dy).sqrt();
-                    let radius = calculate_radius(&shape.mouse_click_positions.0, &shape.mouse_click_positions.1);
-                    tmp_shape = if distance <= radius + TASK_REQUIRED_PIXEL_MINIMUM { shape.clone()} else { tmp_shape}  ;
+                    },
+                    ShapeKind::Rectangle => 
+                    {
+                        let rectangle = Rectangle::new(shape.mouse_click_positions.0, shape.mouse_click_positions.1);
+                        if  is_point_near_rectangle(&rectangle, &self.mouse_global_position) {
+                            tmp_shape = shape.clone(); 
+                            break;
+                        }
+                    },
+                    ShapeKind::Line =>
+                    {
+                        if is_point_on_line(&shape.mouse_click_positions.0, &shape.mouse_click_positions.1, &self.mouse_global_position, LINE_THICKNESS) {
+                            tmp_shape = shape.clone();
+                            break;
+                        }
+                    },
+                    _ => todo!(),
                 }
             }		
             self.shape_buffer.retain(|&shape| shape.mouse_click_positions != tmp_shape.mouse_click_positions )
         }
-
-        
     }
     
 }
@@ -232,4 +253,30 @@ fn calculate_radius (first_vector: &Vector2<f32>, second_vector : &Vector2<f32>)
         let radius = if tmp_coordinate_holder.x > tmp_coordinate_holder.y {tmp_coordinate_holder.x} else {tmp_coordinate_holder.y};
 
         return radius;
+}
+
+
+fn is_point_near_rectangle(rect: &Rectangle, point: &Vector2<f32>) -> bool {
+    let within_x = point.x + TASK_REQUIRED_PIXEL_MINIMUM >= rect.top_left().x
+        && point.x - TASK_REQUIRED_PIXEL_MINIMUM <= rect.bottom_right().x;
+
+    let within_y = point.y + TASK_REQUIRED_PIXEL_MINIMUM  >= rect.top_left().y
+        && point.y - TASK_REQUIRED_PIXEL_MINIMUM  <= rect.bottom_right().y;
+
+    within_x && within_y
+
+}
+
+fn is_point_on_line(starting_point: &Vector2<f32>, end_point: &Vector2<f32>, point: &Vector2<f32>, thickness: f32) -> bool {
+
+    // Calculate the equation of the line Ax + By + C = 0
+    let a = end_point.y - starting_point.y;
+    let b = starting_point.x - end_point.x;
+    let c = (end_point.x - starting_point.x) * starting_point.y + (starting_point.y - end_point.y) * starting_point.x;
+
+    // Calculate distance from the point to the line
+    let distance = (a * point.x + b * point.y + c).abs() / f32::sqrt(a.powi(2) + b.powi(2));
+
+    // Check if the point is within the proximity threshold or if the distance is within the width
+    distance <= LINE_THICKNESS / 2.0 || distance <= thickness
 }
