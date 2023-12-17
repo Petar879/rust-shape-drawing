@@ -109,7 +109,7 @@ impl WindowHandler for MyWindowHandler
                     }
                 });
 
-                ui.menu_button("Shpae", |ui| {
+                ui.menu_button("Shape", |ui| {
                     if ui.button("Rectangle").clicked() {
                         self.shape_type = ShapeKind::Rectangle;
                     }
